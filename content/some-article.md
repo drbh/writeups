@@ -11,6 +11,47 @@ This weekend I hacked my way through my first Hack The Box CTF. This was an exci
 <!-- more -->
 Ut luctus dolor ut tortor hendrerit, sed hendrerit augue scelerisque. Suspendisse quis sodales dui, at tempus ante. Nulla at tempor metus. Aliquam vitae rutrum diam. Curabitur iaculis massa dui, quis varius nulla finibus a. Praesent eu blandit justo. Suspendisse pharetra, arcu in rhoncus rutrum, magna magna viverra erat, eget vestibulum enim tellus id dui. Nunc vel dui et arcu posuere maximus. Mauris quam quam, bibendum sed libero nec, tempus hendrerit arcu. Suspendisse sed gravida orci. Fusce tempor arcu ac est pretium porttitor. Aenean consequat risus venenatis sem aliquam, at sollicitudin nulla semper. Aenean bibendum cursus hendrerit. Nulla congue urna nec finibus bibendum. Donec porta tincidunt ligula non ultricies.
 
+
+# Write up OpenSource
+
+The OpenSource machine was my first HTB machine and I had a great time hacking away and capturing the flags.
+
+The CTF is named open source because the exploit revolves around an open source webapp.
+
+**Discovery**
+
+First we run a port scan on the box to see what services are running. 
+
+```
+nmap -sS 
+```
+
+We are told that there are 3 services running on this Linux box.
+
+Port 22 is ssh, 3000 is some service that looks like it's running but has some IP rules protecting it. Lastly we have port 80 running the custom web app.
+
+We can navigate to the IP in our browser to see what the site looks like.
+
+At the bottom of the page we are given a link to the source.
+
+Inspecting the contents we can see it's a git repo on the dev branch. We can also see that the app is running in a docker container with default args.
+
+We want to see if the source code will give us a way to get us greater then expected access to the box. 
+
+Inside of the views.py file we can see that the code makes relative path calls using user input.
+
+This looks like a good way for us to access more information about or a way to place a file on the box.
+
+We can see that there's some custom written validation logic that removes any ../ we include. It's also written recursively so we can manipulate it to include that sequence of chars.
+
+We can however test if an extra / will navigate us to the root dir. 
+
+After some testing we're positive that we can navigate to any directory in the box.
+
+
+
+
+
 ```python
 import requests
 
