@@ -8,7 +8,7 @@ categories = ["htb"]
 
 This weekend I hacked my way through my first Hack The Box CTF. This was an exciting/frustrating and enlightening experience. 
 
-This writeup cronicles how I hacked the box, and some of the interestings things I learned on the way.
+This writeup chronicles how I hacked the box and some of the interesting things I learned on the way.
 
 <!-- more -->
 
@@ -16,9 +16,9 @@ This writeup cronicles how I hacked the box, and some of the interestings things
 
 The [OpenSource machine](https://app.hackthebox.com/machines) was my first HTB CTF, and I had a great time hacking away and capturing the flags.
 
-This machine is named open source because, the exploit revolves around an open source webapp that has some serious but subtle bugs.
+This machine is named open source because the exploit revolves around an open-source web app that has some serious but subtle bugs.
 
-I was especially excited to get started on this challenge since it is focusd on software development, and I'm coming to the pen testing world as a software engineer.
+I was especially excited to get started on this challenge since it is focused on software development, and I'm coming to the pen testing world as a software engineer.
 
 ## Discovery
 
